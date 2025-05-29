@@ -173,7 +173,7 @@ Responde SOLO con el JSON válido, sin ningún texto antes o después. Si no pue
                 }
             ],
             temperature=0,
-            max_tokens=900
+            max_tokens=1500
         )
         contenido_respuesta = respuesta.choices[0].message.content.strip()
 
