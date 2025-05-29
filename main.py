@@ -30,57 +30,21 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url="https://openroute
 def extraer_texto_pdf(ruta_pdf):
     """
     Esta función toma un archivo PDF y extrae todo su texto para poder analizarlo.
-    
-    ¿Cómo funciona?
-    1. Abre el archivo PDF en modo binario (como datos puros)
-    2. Lee cada página del PDF una por una
-    3. Extrae el texto de cada página
-    4. Combina todo el texto en una sola variable
-    
-    Parámetros:
-        ruta_pdf (str): La ubicación del archivo PDF en tu computadora
-        Ejemplo: "documentos/mi_archivo.pdf"
-    
-    Retorna:
-        str: Todo el texto del PDF junto en una sola cadena de texto
-        Si hay error, retorna None (nada)
+    Modificada para devolver SOLO la primera página (fácil de cambiar para procesar más páginas después).
     """
-    # Variable para guardar todo el texto que vamos extrayendo
     texto_completo = ""
-    
     try:
-        # Abrir el archivo PDF en modo 'rb' (read binary = leer en formato binario)
-        # Los PDFs son archivos binarios, no de texto simple
         with open(ruta_pdf, 'rb') as archivo:
-            
-            # Crear objeto lector de PDF usando PyPDF2
-            # Este objeto nos permite "entender" el contenido del PDF
             lector_pdf = PyPDF2.PdfReader(archivo)
-            
-            # Recorrer cada página del PDF, una por una
-            # len(lector_pdf.pages) nos dice cuántas páginas tiene el PDF
-            for numero_pagina in range(len(lector_pdf.pages)):
-                
-                # Obtener la página actual
-                pagina = lector_pdf.pages[numero_pagina]
-                
-                # Extraer todo el texto de esta página específica
+            # SOLO PRIMERA PÁGINA (fácil de cambiar para más páginas)
+            if len(lector_pdf.pages) > 0:
+                pagina = lector_pdf.pages[0]
                 texto_pagina = pagina.extract_text()
-                
-                # Agregar un separador para identificar cada página
-                # Esto nos ayuda a saber de qué página viene cada texto
-                texto_completo += f"\n--- PÁGINA {numero_pagina + 1} ---\n"
-                
-                # Agregar el texto de esta página al texto completo
+                texto_completo += f"\n--- PÁGINA 1 ---\n"
                 texto_completo += texto_pagina
-                
     except Exception as e:
-        # Si algo sale mal (archivo no existe, está corrupto, etc.)
-        # mostramos un mensaje de error y retornamos None
         print(f"Error al leer el PDF: {e}")
         return None
-    
-    # Retornar todo el texto extraído
     return texto_completo
 
 
@@ -88,75 +52,83 @@ def extraer_texto_pdf(ruta_pdf):
 
 def analizar_estructura_documento(texto_documento):
     """
-    Usa OpenAI para analizar la estructura del documento y identificar:
-    1. Rectángulos con categoría e información
-    2. Información fuera de rectángulos
-    3. Filtrar rectángulos que solo tienen categoría sin información
-    
-    ¿Qué busca la IA?
-    1. Rectángulos que tienen una categoría (título) y información relacionada
-    2. Información importante que está fuera de esos rectángulos
-    3. Datos específicos como nombres, direcciones, teléfonos, etc.
-    
-    ¿Cómo funciona?
-    1. Creamos un "prompt" (instrucciones detalladas para la IA)
-    2. Enviamos el texto del documento + las instrucciones a la IA
-    3. La IA analiza todo y nos devuelve los datos organizados en formato JSON
-    
-    Parámetros:
-        texto_documento (str): Todo el texto que extrajimos del PDF
-    
-    Retorna:
-        dict: Un diccionario (como una caja organizadora) con toda la información
-        clasificada y estructurada, o None si hay algún error
+    Usa OpenAI para analizar SOLO la primera hoja del RUT y extraer la información en la estructura JSON especificada.
     """
-    
-    # DEPURACIÓN: Imprimir longitud del texto y advertir si es muy grande
     print(f"[DEPURACIÓN] Longitud del texto enviado a la IA: {len(texto_documento)} caracteres")
     if len(texto_documento) > 6000:
         print("[ADVERTENCIA] El texto extraído es muy grande. Podrías estar superando el límite de tokens del modelo.")
-    
-    # DEPURACIÓN: Imprimir modelo y parámetros usados
     modelo_usado = "deepseek/deepseek-r1:free"
-    print(f"[DEPURACIÓN] Modelo usado: {modelo_usado}, max_tokens=900, temperature=0")
-    
-    # CREAR LAS INSTRUCCIONES PARA LA IA
+    print(f"[DEPURACIÓN] Modelo usado: {modelo_usado}, max_tokens=1500, temperature=0")
+
+    # PROMPT ESTRUCTURADO PARA LA IA
     prompt = f"""
-Analiza el siguiente texto extraído de un documento PDF. El documento contiene rectángulos con información estructurada de la siguiente manera:
-- Parte superior del rectángulo: nombre de la categoría
-- Parte inferior del rectángulo: información relacionada con esa categoría
+Eres un experto en extracción de datos de documentos oficiales. Analiza letra por letra el siguiente texto extraído de la PRIMERA HOJA de un RUT colombiano. Extrae la información en la siguiente estructura JSON, siguiendo el ORDEN y las CATEGORÍAS especificadas. Si alguna categoría no tiene información, pon el valor "" (cadena vacía). No inventes datos. No incluyas categorías que no estén en la lista. El JSON debe tener exactamente esta estructura y nombres de clave:
 
-INSTRUCCIONES ESPECÍFICAS:
-1. SOLO incluir rectángulos que tengan TANTO categoría COMO información
-2. IGNORAR rectángulos que solo tengan el nombre de la categoría sin información
-3. Para cada rectángulo válido, extraer: nombre de categoría + información completa
-4. También extraer cualquier información importante que esté FUERA de los rectángulos con categoría e información
-5. Organizar la información de manera estructurada
-
-FORMATO DE RESPUESTA (JSON):
 {{
-    "rectangulos_con_informacion": [
-        {{
-            "categoria": "nombre de la categoría",
-            "informacion": "información completa de esa categoría"
-        }}
-    ],
-    "informacion_externa": [
-        "información importante fuera de rectángulos"
-    ],
-    "datos_adicionales": {{
-        "nombres_mencionados": ["lista de nombres"],
-        "direcciones": ["lista de direcciones"],
-        "telefonos": ["lista de teléfonos"],
-        "emails": ["lista de emails"],
-        "fechas": ["lista de fechas"]
+  "informacion_inicial": {{
+    "concepto": "",
+    "numero de formulario": "",
+    "numero de identificacion tributaria": "",
+    "direccion seccional": "",
+    "buzon de elecctronico": ""
+  }},
+  "identificacion": {{
+    "tipo de contribuyente": "",
+    "tipo de documento": "",
+    "numero de identificacion": "",
+    "fecha de expedicion": "",
+    "lugar de expedicion": {{
+      "pais": "",
+      "departamento": "",
+      "ciudad/municipio": ""
+    }},
+    "primer apellido": "",
+    "segundo apellido": "",
+    "primer nombre": "",
+    "otros nombres": "",
+    "razon social": "",
+    "nombre comercial": ""
+  }},
+  "ubicacion": {{
+    "pais": "",
+    "departamento": "",
+    "ciudad/municipio": "",
+    "direccion principal": "",
+    "correo electronico": "",
+    "codigo postal": "",
+    "telefono 1": "",
+    "telefono 2": ""
+  }},
+  "clasificacion": {{
+    "actividad economica": {{
+      "actividad principal": {{"codigo": "", "fecha de inicio de actividad": ""}},
+      "actividad secundaria": {{"codigo": "", "fecha de inicio de actividad": ""}},
+      "otras actividades": [{{"codigo": "", "fecha de inicio de actividad": ""}}]
+    }},
+    "ocupacion": {{
+      "codigo": "",
+      "numero de establecimientos": ""
     }}
+  }},
+  "responsabilidades_calidades_atributos": {{
+    "codigos de responsabilidades": [],
+    "nombre de los codigos": {{}}
+  }},
+  "obligados_aduaneros": {{
+    "codigos aduaneros": []
+  }},
+  "exportadores": {{
+    "forma": "",
+    "tipo": "",
+    "modo": "",
+    "cpc": ""
+  }}
 }}
+
+EXTRAE SOLO LA INFORMACIÓN DE LA PRIMERA HOJA. Si alguna categoría no aparece, pon "" o [] según corresponda. No agregues texto adicional, solo el JSON. Si no puedes extraer nada, responde un JSON con todos los campos vacíos.
 
 TEXTO DEL DOCUMENTO:
 {texto_documento}
-
-Responde SOLO con el JSON válido, sin ningún texto antes o después. Si no puedes, responde exactamente: ERROR_JSON
 """
 
     try:
@@ -173,18 +145,15 @@ Responde SOLO con el JSON válido, sin ningún texto antes o después. Si no pue
                 }
             ],
             temperature=0,
-            max_tokens=1500
+            max_tokens=2500
         )
         contenido_respuesta = respuesta.choices[0].message.content.strip()
-
-        # DEPURACIÓN: Guardar la respuesta cruda de la IA en un archivo temporal
         try:
             with open("respuesta_ia_raw.txt", "w", encoding="utf-8") as f:
                 f.write(contenido_respuesta)
             print("[DEPURACIÓN] Respuesta cruda de la IA guardada en 'respuesta_ia_raw.txt'")
         except Exception as e:
             print(f"[DEPURACIÓN] Error al guardar la respuesta cruda: {e}")
-
         try:
             datos_extraidos = json.loads(contenido_respuesta)
             return datos_extraidos
