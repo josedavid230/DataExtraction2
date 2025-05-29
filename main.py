@@ -1,4 +1,3 @@
-
 # IMPORTACIÓN DE LIBRERÍAS NECESARIAS
 
 # Estas son las herramientas que necesitamos para que nuestro programa funcione
@@ -112,9 +111,16 @@ def analizar_estructura_documento(texto_documento):
         clasificada y estructurada, o None si hay algún error
     """
     
+    # DEPURACIÓN: Imprimir longitud del texto y advertir si es muy grande
+    print(f"[DEPURACIÓN] Longitud del texto enviado a la IA: {len(texto_documento)} caracteres")
+    if len(texto_documento) > 6000:
+        print("[ADVERTENCIA] El texto extraído es muy grande. Podrías estar superando el límite de tokens del modelo.")
+    
+    # DEPURACIÓN: Imprimir modelo y parámetros usados
+    modelo_usado = "deepseek/deepseek-r1:free"
+    print(f"[DEPURACIÓN] Modelo usado: {modelo_usado}, max_tokens=900, temperature=0")
+    
     # CREAR LAS INSTRUCCIONES PARA LA IA
-    # Este "prompt" es como las instrucciones que le damos a un asistente humano
-    # Le decimos exactamente qué queremos que haga y cómo queremos la respuesta
     prompt = f"""
 Analiza el siguiente texto extraído de un documento PDF. El documento contiene rectángulos con información estructurada de la siguiente manera:
 - Parte superior del rectángulo: nombre de la categoría
@@ -150,53 +156,43 @@ FORMATO DE RESPUESTA (JSON):
 TEXTO DEL DOCUMENTO:
 {texto_documento}
 
-Responde ÚNICAMENTE con el JSON válido, sin texto adicional:
+Responde SOLO con el JSON válido, sin ningún texto antes o después. Si no puedes, responde exactamente: ERROR_JSON
 """
 
     try:
-        # ENVIAR LA SOLICITUD A LA INTELIGENCIA ARTIFICIAL
-        # Aquí es donde realmente "hablamos" con la IA
         respuesta = client.chat.completions.create(
-            # Especificar qué modelo de IA queremos usar
-            model="deepseek/deepseek-r1:free",  
-            
-            # Los "mensajes" son como una conversación con la IA
+            model=modelo_usado,
             messages=[
                 {
-                    # Mensaje del "sistema": define el rol de la IA
-                    "role": "system", 
+                    "role": "system",
                     "content": "Eres un experto en extracción de datos de documentos. Analiza cuidadosamente la estructura y extrae solo la información solicitada en formato JSON válido."
                 },
                 {
-                    # Mensaje del "usuario": nuestras instrucciones específicas
-                    "role": "user", 
+                    "role": "user",
                     "content": prompt
                 }
             ],
-            # Configuraciones para controlar la respuesta de la IA
-            temperature=0,  # Temperatura baja = respuestas más predecibles y consistentes
-            max_tokens=900  # Máximo de palabras/tokens que puede usar en la respuesta
+            temperature=0,
+            max_tokens=900
         )
-        
-        # EXTRAER LA RESPUESTA DE LA IA
-        # La IA nos devuelve un objeto complejo, necesitamos extraer solo el texto
         contenido_respuesta = respuesta.choices[0].message.content.strip()
-        
-        # CONVERTIR LA RESPUESTA DE TEXTO A DATOS ESTRUCTURADOS
-        # La IA nos devuelve texto en formato JSON, necesitamos convertirlo a un diccionario de Python
+
+        # DEPURACIÓN: Guardar la respuesta cruda de la IA en un archivo temporal
         try:
-            # json.loads() convierte texto JSON en un diccionario de Python
+            with open("respuesta_ia_raw.txt", "w", encoding="utf-8") as f:
+                f.write(contenido_respuesta)
+            print("[DEPURACIÓN] Respuesta cruda de la IA guardada en 'respuesta_ia_raw.txt'")
+        except Exception as e:
+            print(f"[DEPURACIÓN] Error al guardar la respuesta cruda: {e}")
+
+        try:
             datos_extraidos = json.loads(contenido_respuesta)
             return datos_extraidos
-            
         except json.JSONDecodeError:
-            # Si la IA no devolvió un JSON válido, mostramos el error
             print("Error: La respuesta no es un JSON válido")
             print("Respuesta recibida:", contenido_respuesta)
             return None
-            
     except Exception as e:
-        # Si hay cualquier problema con la conexión a la IA o el procesamiento
         print(f"Error al procesar con OpenAI: {e}")
         return None
 
