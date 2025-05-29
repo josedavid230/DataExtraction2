@@ -445,7 +445,7 @@ if __name__ == "__main__":
     
     # CONFIGURACIÓN: UBICACIÓN DEL ARCHIVO PDF
     # ¡IMPORTANTE! Cambia esta ruta por la ubicación de tu archivo PDF
-    ruta_archivo_pdf = "documents/documento1.pdf"
+    ruta_archivo_pdf = "documents/RUT.pdf"
     
     # VERIFICAR QUE EL ARCHIVO EXISTE
     # Antes de intentar procesarlo, verificamos que el archivo esté donde dijimos
